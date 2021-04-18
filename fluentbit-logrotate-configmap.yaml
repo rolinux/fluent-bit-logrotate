@@ -1,0 +1,36 @@
+apiVersion: v1
+data:
+  logrotate.sh: |
+    #!/bin/sh
+
+    set -euo pipefail
+
+    TODAY=$(date +"%Y-%m-%d")
+    NAMESPACE="logging"
+    DEPLOYMENT_NAME="fluent-bit-server"
+
+    echo "Debug: Will scale $DEPLOYMENT_NAME deployement down to zero"
+
+    curl -X PATCH --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+    https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/apis/apps/v1/namespaces/$NAMESPACE/deployments/$DEPLOYMENT_NAME/scale \
+    -H 'Content-Type: application/strategic-merge-patch+json' \
+    -d '{"spec":{"replicas":0}}' -s
+
+    sleep 15
+
+    mkdir /logs/$TODAY/
+
+    echo "Debug: moving /logs/current/ logs to /logs/$TODAY/ folder"
+    mv /logs/current/*.log /logs/$TODAY/
+
+    echo "Debug: Will scale $DEPLOYMENT_NAME deployement up to one"
+
+    curl -X PATCH --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+    https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/apis/apps/v1/namespaces/$NAMESPACE/deployments/$DEPLOYMENT_NAME/scale \
+    -H 'Content-Type: application/strategic-merge-patch+json' \
+    -d '{"spec":{"replicas":1}}' -s
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: logrotate
+  namespace: logging
