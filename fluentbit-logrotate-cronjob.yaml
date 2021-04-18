@@ -1,0 +1,41 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: logrotate
+  namespace: logging
+spec:
+  schedule: "59 23 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            runAsUser: 1014
+            runAsGroup: 1014
+          restartPolicy: OnFailure
+          serviceAccountName: fluentbit-logrotate
+          containers:
+          - name: logrotate
+            image: curlimages/curl:latest
+            imagePullPolicy: IfNotPresent
+            command: ["/scripts/logrotate.sh"]
+            volumeMounts:
+            - name: data-volume
+              mountPath: /logs
+            - name: logrotate
+              mountPath: /scripts/logrotate.sh
+              subPath: logrotate.sh
+          volumes:
+          - name: data-volume
+            hostPath:
+              path: /volumes/logging/fluent-bit-server
+              type: Directory
+          - name: logrotate
+            configMap:
+              name: logrotate
+              defaultMode: 0755
+              items:
+              - key: logrotate.sh
+                path: logrotate.sh
